@@ -11,9 +11,9 @@ MAGENTA = (0xFF, 0x00, 0xFF)  # FF00FF
 WHITE = (0xFF, 0xFF, 0xFF)
 
 
-def convert_page_to_magenta(pix, threshold: int, outline_only: bool, border_px: int) -> Image.Image:
+def convert_image_to_magenta(img: Image.Image, threshold: int, outline_only: bool, border_px: int) -> Image.Image:
     """
-    fitz Pixmap -> PIL Image -> shudhu Magenta o White color e convert kore
+    PIL Image -> shudhu Magenta o White color e convert kore
 
     outline_only=True hole: boro/thick filled color-r jayga gulo ke pura
     magenta diye bhorat na kore, khali oigulor CHARIDIKE ekta magenta border
@@ -21,7 +21,7 @@ def convert_page_to_magenta(pix, threshold: int, outline_only: bool, border_px: 
     korar somoy ink onek kom lagbe. Kintu patla line ba text (jeta already
     thin/hollow) oi rokom e thakbe, karon segulo eroded hoye 0 hoye jay.
     """
-    img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+    img = img.convert("RGB")
 
     # Grayscale banaye brightness ber kora
     gray = img.convert("L")
@@ -49,6 +49,12 @@ def convert_page_to_magenta(pix, threshold: int, outline_only: bool, border_px: 
     out.paste(magenta_layer, mask=final_mask)
 
     return out
+
+
+def convert_page_to_magenta(pix, threshold: int, outline_only: bool, border_px: int) -> Image.Image:
+    """Convert a rendered PDF page to a Magenta+White image."""
+    img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+    return convert_image_to_magenta(img, threshold, outline_only, border_px)
 
 
 def pdf_to_magenta(
@@ -90,26 +96,58 @@ def pdf_to_magenta(
     print(f"\nDone! Magenta+White PDF save hoyeche: {output_path}")
 
 
-def find_batch_pdfs(folder: str):
+def image_to_magenta(
+    input_path: str,
+    output_path: str,
+    dpi: int = 300,
+    threshold: int = 200,
+    outline_only: bool = True,
+    border_px: int = 3,
+):
+    with Image.open(input_path) as source:
+        converted = convert_image_to_magenta(
+            source, threshold=threshold, outline_only=outline_only, border_px=border_px
+        )
+
+    converted.save(output_path, dpi=(dpi, dpi))
+    print(f"\nDone! Magenta+White image save hoyeche: {output_path}")
+
+
+def find_batch_inputs(folder: str):
     """
-    Script jei folder e ache, oi folder er shob .pdf file khuje ber kore.
-    Age theke banano "_magenta.pdf" output file gulo baad diye dey, jate
-    barbar run korle purono output ke abar input hishebe convert na kore.
+    Script jei folder e ache, oi folder er PDF/PNG/JPG file gulo khuje ber kore.
+    Age theke banano "_magenta" output file gulo baad diye dey.
     """
-    pdfs = []
+    inputs = []
+    supported_extensions = (".pdf", ".png", ".jpg", ".jpeg")
     for name in sorted(os.listdir(folder)):
-        if not name.lower().endswith(".pdf"):
+        if not name.lower().endswith(supported_extensions):
             continue
-        if name.lower().endswith("_magenta.pdf"):
+        if "_magenta." in name.lower():
             continue
-        pdfs.append(os.path.join(folder, name))
-    return pdfs
+        inputs.append(os.path.join(folder, name))
+    return inputs
+
+
+def convert_file(input_path: str, output_path: str, args):
+    extension = os.path.splitext(input_path)[1].lower()
+    options = {
+        "threshold": args.threshold,
+        "outline_only": not args.no_outline,
+        "border_px": args.border,
+    }
+    if extension == ".pdf":
+        pdf_to_magenta(input_path, output_path, dpi=args.dpi, **options)
+    elif extension in (".png", ".jpg", ".jpeg"):
+        image_to_magenta(input_path, output_path, dpi=args.dpi, **options)
+    else:
+        raise ValueError(f"Unsupported input file type: {extension}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Convert any-color PDF to Magenta(FF00FF)+White only PDF")
-    parser.add_argument("input", nargs="?", default=None, help="Input PDF file path (optional - na dile batch mode e script-er folder er shob PDF convert hobe)")
-    parser.add_argument("output", nargs="?", default=None, help="Output PDF file path (optional - shudhu single-file mode e lagbe)")
+    parser = argparse.ArgumentParser(description="Convert PDF/PNG/JPG to Magenta(FF00FF)+White only")
+    parser.add_argument("input", nargs="?", default=None, help="Input PDF/PNG/JPG path (optional - na dile script-er folder e batch mode cholbe)")
+    parser.add_argument("output", nargs="?", default=None, help="Output path (single-file mode e lagbe)")
     parser.add_argument("--dpi", type=int, default=300, help="Output resolution (default 300, print quality-r jonno bhalo)")
     parser.add_argument(
         "--threshold",
@@ -138,29 +176,22 @@ def main():
 
     if args.input is None:
         # ---- BATCH MODE ----
-        # script nijer folder e thaka shob PDF khuje ber kore convert kore
+        # script nijer folder e thaka shob supported file khuje ber kore convert kore
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        pdf_files = find_batch_pdfs(script_dir)
+        input_files = find_batch_inputs(script_dir)
 
-        if not pdf_files:
-            print(f"Kono input PDF pawa jayni ei folder e: {script_dir}")
-            print("Apnar PDF file(gulo) ei script-er sathe SAME folder e rakhun, tarpor abar run korun.")
+        if not input_files:
+            print(f"Kono input PDF/PNG/JPG pawa jayni ei folder e: {script_dir}")
+            print("Input file(gulo) ei script-er sathe SAME folder e rakhun, tarpor abar run korun.")
             return
 
-        print(f"Total {len(pdf_files)} ta PDF file pawa gelo. Batch conversion shuru hocche...\n")
+        print(f"Total {len(input_files)} ta PDF/PNG/JPG file pawa gelo. Batch conversion shuru hocche...\n")
 
-        for idx, input_path in enumerate(pdf_files, start=1):
+        for idx, input_path in enumerate(input_files, start=1):
             base, ext = os.path.splitext(input_path)
             output_path = f"{base}_magenta{ext}"
-            print(f"[{idx}/{len(pdf_files)}] {os.path.basename(input_path)} -> {os.path.basename(output_path)}")
-            pdf_to_magenta(
-                input_path,
-                output_path,
-                dpi=args.dpi,
-                threshold=args.threshold,
-                outline_only=not args.no_outline,
-                border_px=args.border,
-            )
+            print(f"[{idx}/{len(input_files)}] {os.path.basename(input_path)} -> {os.path.basename(output_path)}")
+            convert_file(input_path, output_path, args)
             print()
 
         print("Shob file convert hoye geche!")
@@ -168,16 +199,9 @@ def main():
         # ---- SINGLE FILE MODE (purono niyom) ----
         if args.output is None:
             print("Single file mode e output file er nam o dite hobe. Jemon:")
-            print(f"    python3 pdf_to_magenta.py {args.input} output.pdf")
+            print(f"    python pdf_to_magenta.py {args.input} output{os.path.splitext(args.input)[1]}")
             return
-        pdf_to_magenta(
-            args.input,
-            args.output,
-            dpi=args.dpi,
-            threshold=args.threshold,
-            outline_only=not args.no_outline,
-            border_px=args.border,
-        )
+        convert_file(args.input, args.output, args)
 
 
 if __name__ == "__main__":
