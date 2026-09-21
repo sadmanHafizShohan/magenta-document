@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Magenta Document</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Magenta Document home">
+        <span class="brand-mark">M</span>
+        <span>Magenta Document</span>
+      </a>
+      <span class="status"><i></i> Developed by Shohan</span>
+    </header>
+
+    <section class="intro">
+      <p class="eyebrow">PRINT PREP / 01</p>
+      <h1>Turn documents<br><em>magenta.</em></h1>
+      <p class="lede">Upload your PDF or image files. The converter keeps the artwork crisp and reduces every document to magenta and white.</p>
+    </section>
+
+    {% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+
+    <form class="workspace" action="{{ url_for('convert') }}" method="post" enctype="multipart/form-data">
+      <section class="upload-panel">
+        <label class="dropzone" id="dropzone" for="files">
+          <input id="files" name="files" type="file" accept=".pdf,.png,.jpg,.jpeg" multiple required>
+          <span class="upload-icon">↥</span>
+          <span class="drop-title">Drop files here</span>
+          <span class="drop-copy">or choose from your device</span>
+          <span class="file-types">PDF · PNG · JPG · JPEG</span>
+        </label>
+        <div class="file-list" id="file-list" aria-live="polite"></div>
+      </section>
+
+      <aside class="controls">
+        <div class="section-label">Conversion settings</div>
+        <label class="field">
+          <span>Brightness threshold <b id="threshold-value">200</b></span>
+          <input type="range" name="threshold" id="threshold" min="0" max="255" value="200">
+          <small>Darker pixels become magenta.</small>
+        </label>
+        <label class="field">
+          <span>Border thickness <b id="border-value">3 px</b></span>
+          <input type="range" name="border" id="border" min="0" max="20" value="3">
+          <small>Used when outline mode is enabled.</small>
+        </label>
+        <label class="field compact">
+          <span>Output DPI</span>
+          <select name="dpi">
+            <option value="150">150 DPI · screen</option>
+            <option value="300" selected>300 DPI · print</option>
+            <option value="600">600 DPI · high detail</option>
+          </select>
+        </label>
+        <label class="toggle-row">
+          <span><strong>Outline mode</strong><small>Save ink by leaving large areas white.</small></span>
+          <input type="checkbox" name="outline" checked>
+          <i></i>
+        </label>
+        <button class="convert-button" type="submit"><span>Convert files</span><b>→</b></button>
+      </aside>
+    </form>
+
+    <footer>
+      <span>Files are processed temporarily and removed after download.</span>
+      <span>MAGENTA / WHITE ONLY</span>
+    </footer>
+  </main>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
