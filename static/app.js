@@ -16,7 +16,26 @@ function showFiles(files) {
   });
 }
 
+function setFiles(files) {
+  const fileTransfer = new DataTransfer();
+  [...files].forEach((file) => fileTransfer.items.add(file));
+  input.files = fileTransfer.files;
+  showFiles(input.files);
+}
+
 input.addEventListener('change', () => showFiles(input.files));
+document.addEventListener('paste', (event) => {
+  const imageItem = [...event.clipboardData.items].find((item) => item.type.startsWith('image/'));
+  if (!imageItem) return;
+
+  event.preventDefault();
+  const image = imageItem.getAsFile();
+  if (image) {
+    setFiles([new File([image], `pasted-image.${image.type.split('/')[1] || 'png'}`, { type: image.type })]);
+    dropzone.classList.add('has-paste');
+    window.setTimeout(() => dropzone.classList.remove('has-paste'), 900);
+  }
+});
 ['dragenter', 'dragover'].forEach((eventName) => dropzone.addEventListener(eventName, (event) => {
   event.preventDefault();
   dropzone.classList.add('is-dragging');
@@ -26,8 +45,7 @@ input.addEventListener('change', () => showFiles(input.files));
   dropzone.classList.remove('is-dragging');
 }));
 dropzone.addEventListener('drop', (event) => {
-  input.files = event.dataTransfer.files;
-  showFiles(input.files);
+  setFiles(event.dataTransfer.files);
 });
 threshold.addEventListener('input', () => { thresholdValue.textContent = threshold.value; });
 border.addEventListener('input', () => { borderValue.textContent = `${border.value} px`; });
